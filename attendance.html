@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<title>שעון נוכחות</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f3;
+    --bg3: #eeede9;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #9a9a96;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.2);
+    --green-bg: #eaf3de;
+    --green: #3b6d11;
+    --green-mid: #639922;
+    --red-bg: #fcebeb;
+    --red: #a32d2d;
+    --red-mid: #e24b4a;
+    --blue-bg: #e6f1fb;
+    --blue: #185fa5;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1c;
+      --bg2: #272725;
+      --bg3: #313130;
+      --text: #f0efe9;
+      --text2: #a0a09a;
+      --text3: #6a6a66;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.2);
+      --green-bg: #173404;
+      --green: #9fd15a;
+      --green-mid: #639922;
+      --red-bg: #501313;
+      --red: #f09595;
+      --red-mid: #e24b4a;
+      --blue-bg: #042c53;
+      --blue: #85b7eb;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    background: var(--bg3);
+    color: var(--text);
+    min-height: 100vh;
+    direction: rtl;
+  }
+  #app {
+    max-width: 430px;
+    margin: 0 auto;
+    background: var(--bg3);
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+  .header {
+    background: var(--bg);
+    padding: 16px 20px 12px;
+    border-bottom: 0.5px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-title { font-size: 17px; font-weight: 600; color: var(--text); }
+  .header-sub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .tabs-bar {
+    display: flex;
+    background: var(--bg);
+    padding: 0 16px;
+    border-bottom: 0.5px solid var(--border);
+    gap: 0;
+  }
+  .tab {
+    flex: 1;
+    padding: 12px 4px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text2);
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--text); }
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* Clock */
+  .clock-card {
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    padding: 24px 20px 20px;
+    text-align: center;
+    margin-bottom: 12px;
+    border: 0.5px solid var(--border);
+  }
+  .live-time { font-size: 52px; font-weight: 300; letter-spacing: 1px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .live-date { font-size: 14px; color: var(--text2); margin-top: 6px; }
+  .status-badge {
+    display: inline-block;
+    padding: 5px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 14px;
+  }
+  .badge-in { background: var(--green-bg); color: var(--green); }
+  .badge-out { background: var(--bg2); color: var(--text2); }
+
+  .elapsed-card {
+    background: var(--blue-bg);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .elapsed-label { font-size: 13px; color: var(--blue); }
+  .elapsed-val { font-size: 18px; font-weight: 600; color: var(--blue); font-variant-numeric: tabular-nums; }
+
+  .btn-action {
+    width: 100%;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 600;
+    border-radius: var(--radius-lg);
+    border: none;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: transform 0.1s, opacity 0.1s;
+  }
+  .btn-action:active { transform: scale(0.98); opacity: 0.9; }
+  .btn-in { background: var(--green-mid); color: #fff; }
+  .btn-out { background: var(--red-mid); color: #fff; }
+
+  .alert {
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-bottom: 12px;
+    animation: fadeIn 0.3s;
+  }
+  .alert-ok { background: var(--green-bg); color: var(--green); }
+  .alert-err { background: var(--red-bg); color: var(--red); }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform: none; } }
+
+  /* Cards */
+  .card {
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .card-row:last-child { border-bottom: none; }
+  .row-label { font-size: 14px; color: var(--text2); }
+  .row-val { font-size: 14px; font-weight: 500; color: var(--text); }
+  .row-val.green { color: var(--green); }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .metric {
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+    padding: 16px;
+    text-align: center;
+  }
+  .metric-num { font-size: 28px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+  .metric-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* Monthly table */
+  .month-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .nav-btn {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    width: 34px; height: 34px;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .month-label { font-size: 16px; font-weight: 600; color: var(--text); }
+
+  .day-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 16px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .day-row:last-child { border-bottom: none; }
+  .day-date { font-size: 13px; color: var(--text2); min-width: 50px; }
+  .day-name { font-size: 13px; color: var(--text); flex: 1; text-align: center; }
+  .day-hours { font-size: 13px; font-weight: 600; color: var(--green); }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 14px; }
+
+  /* Export */
+  .btn-export {
+    width: 100%;
+    padding: 13px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background 0.15s;
+  }
+  .btn-export:hover { background: var(--bg2); }
+
+  /* Scrollable list */
+  .scroll-list { max-height: 55vh; overflow-y: auto; }
+
+  /* Safe area for iPhone */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    #app { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-title">שעון נוכחות</div>
+    <div class="header-sub" id="header-user">ניהול שעות עבודה</div>
+  </div>
+  <div class="tabs-bar">
+    <button class="tab active" onclick="showPage('checkin')">דיווח</button>
+    <button class="tab" onclick="showPage('daily')">יומי</button>
+    <button class="tab" onclick="showPage('monthly')">חודשי</button>
+  </div>
+
+  <div id="page-checkin" class="page active"></div>
+  <div id="page-daily" class="page"></div>
+  <div id="page-monthly" class="page"></div>
+</div>
+
+<script>
+const RECORDS_KEY = 'att_records_v2';
+const STATUS_KEY  = 'att_status_v2';
+const DAYS   = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+let records = [];
+let status = { in: false, ts: null, date: null };
+let selMonth = new Date().getMonth();
+let selYear  = new Date().getFullYear();
+let clockTick, elapsedTick;
+
+function load() {
+  try { records = JSON.parse(localStorage.getItem(RECORDS_KEY)) || []; } catch(e) { records = []; }
+  try { status  = JSON.parse(localStorage.getItem(STATUS_KEY))  || { in:false, ts:null, date:null }; } catch(e) {}
+}
+function saveRec() { localStorage.setItem(RECORDS_KEY, JSON.stringify(records)); }
+function saveSta() { localStorage.setItem(STATUS_KEY,  JSON.stringify(status)); }
+
+function dateKey(d) { return d.toISOString().slice(0,10); }
+function fmtTime(d) { return d.toTimeString().slice(0,5); }
+function fmtHours(h) {
+  const hrs  = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  return hrs + ':' + String(mins).padStart(2,'0');
+}
+function diffHours(a, b) { return (b - a) / 3600000; }
+
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.querySelectorAll('.tab').forEach((b,i) => {
+    if (['checkin','daily','monthly'][i]===p) b.classList.add('active');
+  });
+  clearInterval(clockTick); clearInterval(elapsedTick);
+  if (p==='checkin') renderCheckin();
+  if (p==='daily')   renderDaily();
+  if (p==='monthly') renderMonthly();
+}
+
+/* ===== CHECKIN PAGE ===== */
+function renderCheckin() {
+  const el = document.getElementById('page-checkin');
+  el.innerHTML = `
+    <div class="clock-card">
+      <div class="live-time" id="lc-time">--:--:--</div>
+      <div class="live-date" id="lc-date"></div>
+      <span class="status-badge ${status.in ? 'badge-in' : 'badge-out'}" id="lc-badge">
+        ${status.in ? 'במקום העבודה' : 'מחוץ לעבודה'}
+      </span>
+    </div>
+    <div id="lc-elapsed"></div>
+    <div id="lc-msg"></div>
+    <button class="btn-action ${status.in ? 'btn-out' : 'btn-in'}" id="lc-btn"
+      onclick="${status.in ? 'doCheckout()' : 'doCheckin()'}">
+      ${status.in ? 'דיווח יציאה' : 'דיווח כניסה'}
+    </button>
+    <div class="card" id="lc-open">
+      <div class="card-header">רשומה פתוחה</div>
+      ${status.in && status.ts
+        ? `<div class="card-row"><span class="row-label">כניסה</span><span class="row-val">${fmtTime(new Date(status.ts))}</span></div>`
+        : `<div style="padding:14px 16px;font-size:14px;color:var(--text3)">אין כניסה פתוחה</div>`}
+    </div>
+  `;
+  updateClock();
+  clockTick = setInterval(updateClock, 1000);
+  if (status.in) {
+    updateElapsed();
+    elapsedTick = setInterval(updateElapsed, 10000);
+  }
+}
+
+function updateClock() {
+  const now = new Date();
+  const te = document.getElementById('lc-time');
+  const de = document.getElementById('lc-date');
+  if (!te) return;
+  te.textContent = now.toTimeString().slice(0,8);
+  de.textContent = `יום ${DAYS[now.getDay()]}, ${now.getDate()} ב${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+function updateElapsed() {
+  if (!status.in || !status.ts) return;
+  const el = document.getElementById('lc-elapsed');
+  if (!el) return;
+  const h = diffHours(status.ts, Date.now());
+  el.innerHTML = `<div class="elapsed-card"><span class="elapsed-label">זמן מאז הכניסה</span><span class="elapsed-val">${fmtHours(h)} שעות</span></div>`;
+}
+
+function doCheckin() {
+  const now = new Date();
+  status = { in: true, ts: now.getTime(), date: dateKey(now) };
+  saveSta();
+  showMsg('lc-msg', `נרשמה כניסה בשעה ${fmtTime(now)}`, 'ok');
+  setTimeout(() => renderCheckin(), 900);
+}
+
+function doCheckout() {
+  if (!status.in) return;
+  const now  = new Date();
+  const hrs  = diffHours(status.ts, now.getTime());
+  if (hrs < 0.01) { showMsg('lc-msg','יציאה מוקדמת מדי - נסה שוב','err'); return; }
+  records.push({
+    date: status.date || dateKey(now),
+    in:   fmtTime(new Date(status.ts)),
+    out:  fmtTime(now),
+    hours: parseFloat(hrs.toFixed(4)),
+    inTs: status.ts,
+    outTs: now.getTime()
+  });
+  saveRec();
+  status = { in: false, ts: null, date: null };
+  saveSta();
+  showMsg('lc-msg', `נרשמה יציאה — ${fmtHours(hrs)} שעות היום`, 'ok');
+  setTimeout(() => renderCheckin(), 900);
+}
+
+function showMsg(id, txt, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<div class="alert alert-${type==='ok'?'ok':'err'}">${txt}</div>`;
+  setTimeout(() => { if (el) el.innerHTML = ''; }, 4000);
+}
+
+/* ===== DAILY PAGE ===== */
+function renderDaily() {
+  const today = dateKey(new Date());
+  const recs  = records.filter(r => r.date === today);
+  const total = recs.reduce((s,r) => s + r.hours, 0);
+  const now   = new Date();
+  const el    = document.getElementById('page-daily');
+
+  let open = '';
+  if (status.in && status.ts) {
+    const h = diffHours(status.ts, Date.now());
+    open = `<div class="alert alert-ok" style="margin-bottom:12px">כניסה פתוחה: ${fmtTime(new Date(status.ts))} (${fmtHours(h)} שעות עד כה)</div>`;
+  }
+
+  const rows = recs.length
+    ? recs.map(r => `
+        <div class="card-row">
+          <span class="row-label">כניסה ${r.in} — יציאה ${r.out}</span>
+          <span class="row-val green">${fmtHours(r.hours)}</span>
+        </div>`).join('')
+    : `<div style="padding:14px 16px;font-size:14px;color:var(--text3)">אין רישומים להיום</div>`;
+
+  el.innerHTML = `
+    <div style="font-size:14px;font-weight:500;color:var(--text2);margin-bottom:12px">
+      יום ${DAYS[now.getDay()]}, ${now.getDate()} ב${MONTHS[now.getMonth()]} ${now.getFullYear()}
+    </div>
+    ${open}
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-num">${fmtHours(total)}</div>
+        <div class="metric-label">שעות היום</div>
+      </div>
+      <div class="metric">
+        <div class="metric-num">${recs.length}</div>
+        <div class="metric-label">רישומים</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">פירוט היום</div>
+      ${rows}
+    </div>
+  `;
+}
+
+/* ===== MONTHLY PAGE ===== */
+function renderMonthly() {
+  const el   = document.getElementById('page-monthly');
+  const recs = records.filter(r => {
+    const d = new Date(r.date);
+    return d.getMonth()===selMonth && d.getFullYear()===selYear;
+  });
+
+  const grouped = {};
+  recs.forEach(r => { (grouped[r.date] = grouped[r.date]||[]).push(r); });
+  const days      = Object.keys(grouped).sort();
+  const totalH    = recs.reduce((s,r) => s+r.hours, 0);
+  const workDays  = days.length;
+  const avgH      = workDays ? totalH/workDays : 0;
+
+  const rows = days.length
+    ? days.map(d => {
+        const dt = new Date(d);
+        const h  = grouped[d].reduce((s,r)=>s+r.hours,0);
+        return `<div class="day-row">
+          <span class="day-date">${dt.getDate()}.${String(dt.getMonth()+1).padStart(2,'0')}</span>
+          <span class="day-name">יום ${DAYS[dt.getDay()]}</span>
+          <span class="day-hours">${fmtHours(h)}</span>
+        </div>`;
+      }).join('')
+    : `<div class="empty">אין נתונים לחודש זה</div>`;
+
+  el.innerHTML = `
+    <div class="month-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">&#8250;</button>
+      <span class="month-label">${MONTHS[selMonth]} ${selYear}</span>
+      <button class="nav-btn" onclick="changeMonth(1)">&#8249;</button>
+    </div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-num">${fmtHours(totalH)}</div>
+        <div class="metric-label">שעות חודש</div>
+      </div>
+      <div class="metric">
+        <div class="metric-num">${workDays}</div>
+        <div class="metric-label">ימי עבודה</div>
+        <div class="metric-sub">ממוצע ${fmtHours(avgH)} ליום</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">פירוט ימים</div>
+      <div class="scroll-list">${rows}</div>
+    </div>
+    ${days.length ? `<button class="btn-export" onclick="exportCSV()">ייצא לאקסל (CSV)</button>` : ''}
+  `;
+}
+
+function changeMonth(dir) {
+  selMonth -= dir;
+  if (selMonth < 0)  { selMonth = 11; selYear--; }
+  if (selMonth > 11) { selMonth = 0;  selYear++; }
+  renderMonthly();
+}
+
+function exportCSV() {
+  const recs = records.filter(r => {
+    const d = new Date(r.date);
+    return d.getMonth()===selMonth && d.getFullYear()===selYear;
+  });
+  if (!recs.length) return;
+  const header = 'תאריך,יום,כניסה,יציאה,שעות\n';
+  const body   = recs.map(r => {
+    const d = new Date(r.date);
+    return `${r.date},${DAYS[d.getDay()]},${r.in},${r.out},${r.hours.toFixed(2)}`;
+  }).join('\n');
+  const blob = new Blob(['\uFEFF' + header + body], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `נוכחות_${MONTHS[selMonth]}_${selYear}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+load();
+renderCheckin();
+</script>
+</body>
+</html>
